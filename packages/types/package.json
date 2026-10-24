@@ -1,0 +1,20 @@
+{
+  "name": "@zequel/types",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./cms-types": "./src/cms-types.ts",
+    "./cms-schema": "./src/cms-schema.ts"
+  },
+  "scripts": {
+    "lint": "echo \"@zequel/types: no lint\"",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf .turbo node_modules"
+  },
+  "devDependencies": {
+    "@zequel/config": "workspace:^",
+    "typescript": "5.7.3"
+  }
+}

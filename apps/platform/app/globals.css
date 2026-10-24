@@ -1,0 +1,13 @@
+/*
+ * Zequel Platform — app-level stylesheet.
+ * Design tokens, Tailwind import, and base layers live in the shared
+ * @zequel/ui package so every app stays visually consistent.
+ */
+@import "@zequel/ui/globals.css";
+
+/*
+ * Tailwind v4 auto-detects sources next to this file, but it ignores
+ * node_modules — where the workspace UI package is symlinked. Point it
+ * at the package source so component class names are not purged.
+ */
+@source "../../../packages/ui/src";

@@ -1,0 +1,16 @@
+appId: com.zequel.desktop
+productName: Zequel
+directories:
+  output: release
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+mac:
+  category: public.app-category.developer-tools
+  target: dmg
+linux:
+  target: AppImage
+  category: Development
+win:
+  target: nsis

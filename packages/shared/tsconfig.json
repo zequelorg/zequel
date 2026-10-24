@@ -1,0 +1,9 @@
+{
+  "extends": "@zequel/config/tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", ".turbo"]
+}

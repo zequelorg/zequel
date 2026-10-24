@@ -1,0 +1,25 @@
+{
+  "name": "Zequel — Research System",
+  "short_name": "Zequel",
+  "description": "Structured research workspace for evidence-backed reasoning, multi-document analysis, and traceable synthesis.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#000000",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/zequel-logo-new.png",
+      "sizes": "1080x1080",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/zequel-logo-new.png",
+      "sizes": "1080x1080",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["productivity", "education", "utilities"]
+}

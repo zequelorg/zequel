@@ -1,0 +1,33 @@
+{
+  "name": "@zequel/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Zequel Desktop — local-first AI-assisted development and codebase research environment.",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k -n VITE,ELECTRON -c blue,magenta \"vite\" \"npm:electron:dev\"",
+    "electron:dev": "tsc -p tsconfig.electron.json && wait-on tcp:5173 && cross-env ZEQUEL_DESKTOP_DEV_SERVER_URL=http://localhost:5173 electron dist-electron/main.js",
+    "build:renderer": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build": "npm run build:electron && npm run build:renderer",
+    "package": "npm run build && electron-builder",
+    "type-check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit"
+  },
+  "dependencies": {
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@types/node": "^22",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "typescript": "5.7.3",
+    "vite": "^6.0.7",
+    "wait-on": "^8.0.1"
+  }
+}

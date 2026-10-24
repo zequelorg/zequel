@@ -1,0 +1,10 @@
+{
+  "name": "@zequel/config",
+  "version": "1.0.0",
+  "private": true,
+  "files": [
+    "tsconfig.base.json",
+    "tsconfig.nextjs.json",
+    "postcss.config.mjs"
+  ]
+}
