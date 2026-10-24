@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import type { DirectoryEntry } from '../electron/ipc-contract'
 import { FileTree } from './FileTree'
+import { BackendStatus } from './BackendStatus'
 
 /**
  * First vertical slice of Zequel Desktop.
@@ -53,6 +54,8 @@ export function App() {
           Open Folder
         </button>
         {projectRoot && <span className="project-root">{projectRoot}</span>}
+        <span className="header-spacer" />
+        <BackendStatus />
       </header>
 
       {error && <div className="error-banner">{error}</div>}

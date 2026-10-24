@@ -21,12 +21,24 @@ installs work normally again.
 
 ## Running it
 
+The Go backend needs to be built once first — see `/backend/README.md`:
+
+```bash
+cd backend && go build -o bin/zequeld ./cmd/zequeld && cd ..
+```
+
+Then:
+
 ```bash
 pnpm --filter @zequel/desktop dev
 ```
 
 This starts the Vite dev server for the renderer and launches Electron
-pointed at it. Closing the window stops both.
+pointed at it, which in turn spawns the Go backend (see
+`electron/backend.ts`). If the backend binary isn't built yet, Electron logs
+an error and the window still opens — the header's backend status indicator
+will show "unreachable" rather than the app silently pretending to work.
+Closing the window stops both processes.
 
 ## What's real right now
 
@@ -39,6 +51,11 @@ pointed at it. Closing the window stops both.
   against the opened project root before touching disk.
 - `docs/SECURITY.md` documents this boundary — read it before adding any new
   IPC handler.
+- A real Go backend process (`backend/`), spawned and health-checked by
+  Electron, reachable only from the main process (never the renderer
+  directly) over a loopback HTTP connection with a per-launch bearer token.
+  Right now it does exactly one thing — answer `/v1/health` — and the header
+  shows the real, live result of that call, not a mock.
 
 ## What's NOT here yet (so don't assume it works)
 
@@ -55,8 +72,11 @@ pointed at it. Closing the window stops both.
 ## I have not run this
 
 Everything above was written and reviewed for correctness, but this sandbox
-has no network access (can't resolve npm packages) and no display (can't
-launch an actual Electron window), so `pnpm install`, `pnpm dev`, and a real
-packaged build are all **unverified**. Please run the install + dev command
-above and tell me what actually happens — that's real signal I don't have
-yet.
+has no network access (can't resolve npm packages, can't fetch Go even if I
+wanted to) and no display (can't launch an actual Electron window). Neither
+`pnpm install`/`pnpm dev` nor `go build`/`go test` in `backend/` have been run
+by me — all **unverified**, the Go side more so, since Go is compiled and
+hand-written Go is more likely to have a small mistake a compiler would catch
+instantly. Please run both (see `/backend/README.md` for the Go commands) and
+tell me exactly what happens, errors included — that's real signal I don't
+have yet.

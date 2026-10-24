@@ -79,6 +79,40 @@ body {
   white-space: nowrap;
 }
 
+.header-spacer {
+  flex: 1;
+}
+
+.backend-status {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.backend-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+
+.backend-status--connected .backend-status-dot {
+  background: #22c55e;
+}
+
+.backend-status--unreachable .backend-status-dot {
+  background: var(--destructive);
+}
+
+.backend-status--unreachable {
+  color: var(--destructive);
+}
+
 .error-banner {
   flex-shrink: 0;
   padding: 8px 14px;

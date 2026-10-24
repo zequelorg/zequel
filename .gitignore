@@ -14,3 +14,10 @@ dist/
 .env*.local
 .DS_Store
 .vercel
+
+# Desktop app (Electron) build outputs
+dist-electron/
+release/
+
+# Go backend build output
+backend/bin/

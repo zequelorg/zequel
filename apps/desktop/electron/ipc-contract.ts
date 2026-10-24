@@ -9,7 +9,13 @@ export const IPC = {
   PROJECT_READ_DIRECTORY: 'project:read-directory',
   PROJECT_READ_FILE: 'project:read-file',
   PROJECT_WRITE_FILE: 'project:write-file',
+  BACKEND_HEALTH: 'backend:health',
 } as const
+
+export interface BackendHealth {
+  status: string
+  version: string
+}
 
 export interface DirectoryEntry {
   name: string

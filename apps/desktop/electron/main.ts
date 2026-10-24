@@ -1,7 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { IPC } from './ipc-contract'
+import { IPC, type BackendHealth } from './ipc-contract'
+import { startBackend, stopBackend, backendFetch } from './backend'
 
 // ─── Project root authorization ─────────────────────────────────────────────
 //
@@ -78,10 +79,23 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+
+  // Backend startup failure (e.g. binary not built yet — see
+  // backend/README.md) does not crash the app: the renderer's health check
+  // will simply report "not connected" instead of silently pretending to work.
+  startBackend().catch((err) => {
+    console.error('[backend] failed to start:', err)
+  })
 })
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+app.on('will-quit', async (event) => {
+  event.preventDefault()
+  await stopBackend()
+  app.exit()
 })
 
 // ─── IPC handlers ────────────────────────────────────────────────────────────
@@ -134,3 +148,7 @@ ipcMain.handle(
     return true
   }
 )
+
+ipcMain.handle(IPC.BACKEND_HEALTH, async (): Promise<BackendHealth> => {
+  return (await backendFetch('/v1/health')) as BackendHealth
+})

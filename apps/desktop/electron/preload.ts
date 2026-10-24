@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { IPC, type DirectoryEntry } from './ipc-contract'
+import { IPC, type DirectoryEntry, type BackendHealth } from './ipc-contract'
 
 // This is the entire API surface exposed to the renderer. The renderer has
 // no access to `ipcRenderer`, `require`, or any other Node.js capability —
@@ -29,6 +29,11 @@ const zequelBridge = {
       ipcRenderer.invoke(IPC.PROJECT_READ_FILE, relativePath),
     writeFile: (relativePath: string, content: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC.PROJECT_WRITE_FILE, relativePath, content),
+  },
+  backend: {
+    // Proxies to the Go backend's GET /v1/health. The renderer never sees the
+    // backend's port or auth token — only this one specific, named result.
+    health: (): Promise<BackendHealth> => ipcRenderer.invoke(IPC.BACKEND_HEALTH),
   },
 }
 
