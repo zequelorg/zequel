@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { app } from 'electron'
 
 /**
  * Owns the lifecycle of the Go backend process (zequeld).
@@ -11,11 +12,14 @@ import path from 'node:path'
  * ever see it. See docs/SECURITY.md and backend/api/API.md for the full
  * picture of why the boundary is shaped this way.
  *
- * NOTE on packaged builds: this currently only knows how to find the Go
- * binary in a local dev checkout (backend/bin/zequeld, built by hand — see
- * backend/README.md). Resolving the binary inside a packaged .app/.exe via
- * electron-builder `extraResources` is not implemented yet; that's tracked in
- * docs/STATUS.md, not silently assumed to work.
+ * Binary resolution (resolveBackendBinaryPath) branches on app.isPackaged:
+ * a dev checkout finds it at backend/bin/zequeld (built by hand — see
+ * backend/README.md); a packaged app finds it under process.resourcesPath,
+ * where electron-builder.yml's `extraResources` entry puts it. The packaged
+ * path is designed and should be structurally correct, but has never been
+ * exercised — no packaged build has been produced in this environment (see
+ * docs/STATUS.md and docs/PACKAGING.md for what that still requires: a real
+ * build machine per target OS/arch).
  */
 
 let child: ChildProcess | null = null
@@ -24,8 +28,13 @@ let backendToken: string | null = null
 
 function resolveBackendBinaryPath(): string {
   const binaryName = process.platform === 'win32' ? 'zequeld.exe' : 'zequeld'
-  // Dev-mode only for now (see NOTE above). Repo root is three levels up
-  // from apps/desktop/electron/ at runtime (dist-electron/backend.js).
+  if (app.isPackaged) {
+    // Matches the `to: "backend"` destination in electron-builder.yml's
+    // extraResources entry.
+    return path.join(process.resourcesPath, 'backend', binaryName)
+  }
+  // Dev mode: repo root is three levels up from apps/desktop/electron/ at
+  // runtime (dist-electron/backend.js).
   return path.resolve(__dirname, '../../../backend/bin', binaryName)
 }
 
@@ -38,6 +47,11 @@ export interface BackendHandle {
 }
 
 export function startBackend(): Promise<BackendHandle> {
+  if (child) {
+    return Promise.reject(
+      new Error('startBackend() called while a backend process is already running.')
+    )
+  }
   return new Promise((resolve, reject) => {
     const binaryPath = resolveBackendBinaryPath()
     if (!existsSync(binaryPath)) {
@@ -52,11 +66,17 @@ export function startBackend(): Promise<BackendHandle> {
 
     const token = randomBytes(32).toString('hex')
 
+    // Token goes over stdin, not an environment variable — env vars of a
+    // running process are readable by other processes owned by the same
+    // user (e.g. /proc/<pid>/environ on Linux), which would partly defeat
+    // requiring a token at all. Stdin leaves no such standing exposure once
+    // read. See readToken() in backend/cmd/zequeld/main.go for the other side.
     const proc = spawn(binaryPath, [], {
-      env: { ...process.env, ZEQUEL_BACKEND_TOKEN: token },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     })
     child = proc
+    proc.stdin?.write(token + '\n')
+    proc.stdin?.end()
 
     const timeout = setTimeout(() => {
       proc.kill()

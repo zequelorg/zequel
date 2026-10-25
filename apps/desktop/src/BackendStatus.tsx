@@ -2,15 +2,19 @@ import { useEffect, useState } from 'react'
 
 type Status = 'checking' | 'connected' | 'unreachable'
 
-const POLL_INTERVAL_MS = 1500
-const MAX_ATTEMPTS = 10
+const POLL_INTERVAL_MS = 2000
 
 /**
  * Polls the real Go backend through window.zequel.backend.health() — not a
- * mock. The backend is started in parallel with window creation (see
- * main.ts), so the first few attempts failing while it finishes starting up
- * is expected, not an error state; only report "unreachable" after
- * MAX_ATTEMPTS genuinely fail.
+ * mock. Polling never stops: the backend is started in parallel with window
+ * creation (see main.ts), so early failures while it's still starting up are
+ * expected, not an error — but this keeps checking indefinitely rather than
+ * giving up after N attempts, specifically so the indicator stays truthful if
+ * the backend starts late, or — more importantly — if it was connected and
+ * then crashes or is killed later in the session. An earlier version of this
+ * component stopped polling after 10 failures, which meant the UI could keep
+ * showing "connected" forever after an unexpected backend exit. It no longer
+ * does that.
  */
 export function BackendStatus() {
   const [status, setStatus] = useState<Status>('checking')
@@ -18,7 +22,7 @@ export function BackendStatus() {
 
   useEffect(() => {
     let cancelled = false
-    let attempts = 0
+    let timer: ReturnType<typeof setTimeout>
 
     const poll = async () => {
       try {
@@ -26,21 +30,21 @@ export function BackendStatus() {
         if (cancelled) return
         setStatus('connected')
         setVersion(health.version)
-        return
       } catch {
-        attempts += 1
         if (cancelled) return
-        if (attempts >= MAX_ATTEMPTS) {
-          setStatus('unreachable')
-          return
+        setStatus('unreachable')
+        setVersion(null)
+      } finally {
+        if (!cancelled) {
+          timer = setTimeout(() => void poll(), POLL_INTERVAL_MS)
         }
-        setTimeout(() => void poll(), POLL_INTERVAL_MS)
       }
     }
 
     void poll()
     return () => {
       cancelled = true
+      clearTimeout(timer)
     }
   }, [])
 

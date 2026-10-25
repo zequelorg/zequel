@@ -36,46 +36,59 @@ cd backend
 go test ./...
 ```
 
-`internal/server/server_test.go` covers the health endpoint and the auth
-middleware (valid token, missing token, wrong token, wrong HTTP method) using
-only `net/http/httptest` — no network, no real process spawn needed to run
-these.
+`internal/server/server_test.go` covers the health endpoint, the auth
+middleware (valid token, missing token, wrong token, wrong HTTP method), the
+Host-header check, and that auth/host-checking wraps the whole mux (not just
+known routes) — using only `net/http/httptest`, no network, no real process
+spawn needed to run these.
 
 ## Run standalone (without Electron)
 
 The daemon refuses to start without a token, by design (see
-`internal/server/auth.go`). To run it manually for debugging:
+`internal/server/auth.go`). It reads the token as one line from **stdin**,
+not an environment variable (env vars of a running process are readable by
+other processes owned by the same user, which would partly defeat requiring a
+token at all — see the comment at the top of `cmd/zequeld/main.go`). To run
+it manually for debugging:
 
 ```bash
-ZEQUEL_BACKEND_TOKEN=dev-token ./bin/zequeld
+echo "dev-token" | ./bin/zequeld
 ```
 
 It will print `ZEQUEL_BACKEND_PORT=<port>` to stdout, then you can hit it
-directly:
+directly — including the Host header, which also has to match exactly or
+you'll get `403`:
 
 ```bash
 curl -H "Authorization: Bearer dev-token" http://127.0.0.1:<port>/v1/health
 ```
 
+(`curl` sets the `Host` header to `127.0.0.1:<port>` automatically from the
+URL, so this works as-is — just don't use `localhost` in place of
+`127.0.0.1`, which would fail the Host check.)
+
 ## How Electron finds this binary
 
-Right now, dev-mode only: `apps/desktop/electron/backend.ts` looks for the
-built binary at `backend/bin/zequeld` relative to the repo root. If it's not
-there, Electron logs an error and starts the window anyway — the renderer's
-backend status indicator will show "unreachable" instead of the app crashing.
+`apps/desktop/electron/backend.ts`'s `resolveBackendBinaryPath()` branches on
+whether the app is packaged: dev mode looks for `backend/bin/zequeld`
+relative to the repo root; a packaged build looks under
+`process.resourcesPath`. If the binary isn't found, Electron logs an error
+and starts the window anyway — the renderer's backend status indicator will
+show "unreachable" instead of the app crashing.
 
-**Not implemented yet:** resolving this binary inside a packaged
-`.app`/`.exe` build (needs `extraResources` wiring in
-`apps/desktop/electron-builder.yml` plus a per-platform build step that cross-
-compiles `zequeld` for the target OS before packaging). Tracked in
-`/docs/STATUS.md`.
+Full packaging design (CI matrix, `extraResources` wiring, what's still
+unverified) is in `/docs/PACKAGING.md` — the short version: the packaged path
+is wired into `electron-builder.yml` but has never actually been exercised by
+a real packaged build.
 
 ## What's here vs. what's next
 
-Implemented in this slice: the HTTP server, the auth middleware, one
-endpoint (`/v1/health`), and the Electron spawn/health-check/shutdown
-lifecycle around it. That's it — `internal/project`, `internal/index`,
-`internal/research`, `internal/coding`, `internal/aiprovider`, and
-`internal/storage` are empty directories reserved for the next incremental
-steps, not stubbed-out fake implementations. Nothing in this repo should
-claim they exist yet.
+Implemented: the HTTP server, auth + Host-header middleware (wrapping the
+whole mux, not per-route — see the comment on `server.New` in
+`internal/server/server.go`), one endpoint (`/v1/health`), and the Electron
+spawn/health-check/shutdown lifecycle around it, including stdin-based token
+delivery and dev-vs-packaged binary resolution. That's it — `internal/project`,
+`internal/index`, `internal/research`, `internal/coding`, `internal/aiprovider`,
+and `internal/storage` each contain only a `doc.go` recording their intended
+purpose and the Coding/Research boundary rule (see that file in each
+directory) — no actual logic yet. Nothing in this repo should claim otherwise.

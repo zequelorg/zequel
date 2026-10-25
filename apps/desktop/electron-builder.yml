@@ -6,6 +6,16 @@ files:
   - dist/**
   - dist-electron/**
   - package.json
+# The Go backend binary for the CURRENT build target. This must already be
+# built for the right OS/arch at backend/bin/ before electron-builder runs —
+# see /docs/PACKAGING.md. electron-builder does not cross-compile Go; a CI
+# matrix builds natively per target, placing the one right binary at this
+# fixed path, then packages that target. This entry's `to` path is what
+# apps/desktop/electron/backend.ts's packaged-mode branch of
+# resolveBackendBinaryPath() expects under process.resourcesPath.
+extraResources:
+  - from: "../../backend/bin"
+    to: "backend"
 mac:
   category: public.app-category.developer-tools
   target: dmg

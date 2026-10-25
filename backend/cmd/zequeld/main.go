@@ -3,8 +3,13 @@
 // apps/desktop/electron/backend.ts) and is never run standalone in normal
 // use. It:
 //
-//  1. Reads its auth token from ZEQUEL_BACKEND_TOKEN (required — the process
-//     refuses to start without one; there is no "unauthenticated mode").
+//  1. Reads its auth token as a single line from stdin (required — the
+//     process refuses to start without one; there is no "unauthenticated
+//     mode"). Deliberately NOT an environment variable: a process's env vars
+//     are readable by other processes owned by the same user (e.g. via
+//     /proc/<pid>/environ on Linux, or process-inspection tools on macOS/
+//     Windows), which would partly defeat the point of requiring a token in
+//     the first place. Stdin, once read, leaves no such standing exposure.
 //  2. Binds an HTTP listener to 127.0.0.1 on an OS-assigned ephemeral port
 //     (never a fixed port, and never 0.0.0.0).
 //  3. Prints that port to stdout as the single line `ZEQUEL_BACKEND_PORT=<n>`,
@@ -15,6 +20,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"log"
@@ -22,16 +28,32 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"zequel.dev/backend/internal/server"
 )
 
+func readToken() (string, error) {
+	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	token := strings.TrimSpace(line)
+	if token != "" {
+		// A token was read even if ReadString also returned io.EOF because
+		// the writer closed stdin right after the newline without a trailing
+		// byte — that's a normal, successful case, not an error.
+		return token, nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("reading token from stdin: %w", err)
+	}
+	return "", fmt.Errorf("empty token read from stdin")
+}
+
 func main() {
-	token := os.Getenv("ZEQUEL_BACKEND_TOKEN")
-	if token == "" {
-		log.Fatal("ZEQUEL_BACKEND_TOKEN is required; refusing to start without auth")
+	token, err := readToken()
+	if err != nil {
+		log.Fatalf("failed to read auth token on stdin; refusing to start without auth: %v", err)
 	}
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -45,7 +67,7 @@ func main() {
 	fmt.Printf("ZEQUEL_BACKEND_PORT=%d\n", port)
 
 	httpServer := &http.Server{
-		Handler:           server.New(token),
+		Handler:           server.New(token, port),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

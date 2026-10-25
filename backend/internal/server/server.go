@@ -9,19 +9,40 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
 const Version = "0.1.0"
 
-// New builds the server's handler. token is the per-launch bearer token every
-// request must present (see auth.go).
-func New(token string) http.Handler {
+// New builds the server's handler.
+//   - token is the per-launch bearer token every request must present (see
+//     requireToken in auth.go).
+//   - port is the port this server is bound to on 127.0.0.1 (the caller gets
+//     this from the listener it already created — see cmd/zequeld/main.go).
+//     It's used only to build the exact Host header value requests must match
+//     (see requireHost in auth.go); it does not change what this server binds
+//     to.
+//
+// Routes are registered on a plain mux with NO per-route auth — auth and the
+// host check are applied exactly once, here, wrapping the entire mux. This is
+// deliberate: per-route wrapping (the original version of this function)
+// means every future route addition has to remember to wrap itself, and
+// forgetting is a silent, serious bug (an unauthenticated route on a server
+// that's supposed to require a token on everything). Wrapping the whole mux
+// once makes that class of bug structurally impossible — a new route added to
+// routes() is protected automatically, with no action required.
+func New(token string, port int) http.Handler {
 	mux := http.NewServeMux()
+	routes(mux)
+	expectedHost := fmt.Sprintf("127.0.0.1:%d", port)
+	return requireHost(expectedHost, requireToken(token, mux.ServeHTTP))
+}
 
-	mux.HandleFunc("/v1/health", requireToken(token, handleHealth))
-
-	return mux
+// routes registers every endpoint. Add new routes here, unauthenticated —
+// New() applies auth once, above, to everything this function registers.
+func routes(mux *http.ServeMux) {
+	mux.HandleFunc("/v1/health", handleHealth)
 }
 
 type healthResponse struct {
