@@ -70,6 +70,7 @@ See `backend/README.md` for running/testing the Go backend on its own, and
 - [`docs/STATUS.md`](docs/STATUS.md) — what's actually implemented vs. planned, kept current every pass
 - [`docs/SECURITY.md`](docs/SECURITY.md) — the Electron↔Go security boundary
 - [`docs/PACKAGING.md`](docs/PACKAGING.md) — cross-platform build/packaging design
+- [`.github/workflows/build.yml`](.github/workflows/build.yml) — the actual CI workflow: tests, then packages Windows/macOS (Apple Silicon + Intel)/Linux builds on every push — written but not yet run for real, see `docs/STATUS.md`
 - [`backend/api/API.md`](backend/api/API.md) — the Go backend's HTTP contract
 - [`docs/LEGACY-TECHNICAL-REFERENCE.md`](docs/LEGACY-TECHNICAL-REFERENCE.md) — reference material from the original web-app design (historical; the web app itself no longer exists in this repo)
 - [`MIGRATION-REPORT.md`](MIGRATION-REPORT.md) — record of the original monolith → monorepo migration (historical)

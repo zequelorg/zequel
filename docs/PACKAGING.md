@@ -2,11 +2,19 @@
 
 ## Status
 
-**Designed and wired into config; not yet exercised.** No packaged build has
-been produced in this project — there's no network or Go toolchain in the
-sandbox this was written in, let alone a macOS/Windows/Linux build matrix. The
-pieces below are real (code + config, not just prose) but unverified end to
-end.
+**Designed, wired into config, and now a real CI workflow — still not
+exercised.** `.github/workflows/build.yml` implements the exact matrix
+below: a `test` job (Go vet/test/build sanity check, JS type-check, lint),
+then a `build` job matrix across macOS Apple Silicon, macOS Intel, Windows
+x64, and Linux x64, each building the Go backend natively, building the
+Electron app, and running `electron-builder`, with the packaged app uploaded
+as a downloadable artifact. It has never actually run — this sandbox has no
+GitHub Actions access, so it's written carefully against each action's
+documented behavior, not confirmed by a real run. **Push it and watch the
+first run before trusting it.** The Go backend itself, unlike the workflow
+wrapping it, actually has been built and tested for real, in this sandbox
+(see `docs/STATUS.md`, `backend/README.md`) — that part of this pipeline is
+on solid ground; the CI orchestration around it is not yet proven.
 
 ## The core constraint
 
@@ -90,6 +98,38 @@ once packaging is actually attempted, not an assumption made in advance here.
 3. Does macOS Gatekeeper/notarization block the spawned binary?
 4. Does the Windows build need the binary's execute bit / any additional
    manifest for SmartScreen?
+5. Does `.github/workflows/build.yml` actually pass on a real push — in
+   particular: does `pnpm install --no-frozen-lockfile` resolve the newly
+   added Tailwind/CodeMirror/lucide-react dependencies cleanly (this has
+   never run against the real npm registry, only attempted and blocked in
+   the sandbox — see `docs/STATUS.md`), and does the proactive `libfuse2`
+   install actually cover everything the Linux `electron-builder` AppImage
+   step needs, or are there other missing system packages this document
+   didn't anticipate?
 
 None of these have answers yet. This document is the plan, not a confirmation
 any of it works.
+
+## CI workflow
+
+`.github/workflows/build.yml` — triggers on push to `main`, on pull
+requests, and manually (`workflow_dispatch`). Two jobs:
+
+- `test` (ubuntu-latest, fast): `go vet`, `go test -v`, a `go build` sanity
+  check, `pnpm install`, `tsc --noEmit` for `apps/desktop`, and `pnpm lint`
+  (non-blocking for now — see the workflow's own comment on why).
+- `build` (needs `test` to pass first): the four-target matrix above, each
+  producing a downloadable artifact (`actions/upload-artifact`, 14-day
+  retention). `--publish=never` is explicit — this workflow does not publish
+  a GitHub Release or wire up auto-updates; that's separate future work.
+
+Known rough edges, flagged in the workflow's own comments rather than
+hidden: the lockfile install uses `--no-frozen-lockfile` because
+`pnpm-lock.yaml` doesn't have a resolved `apps/desktop` entry yet (same
+network-access gap as everywhere else in this project's history); the Linux
+job proactively installs `libfuse2` before packaging (modern `ubuntu-latest`
+runners don't ship it, and electron-builder's AppImage target needs it —
+fixed in advance rather than left for the first failure to surface it, but
+still unconfirmed since the workflow has never run); code signing/
+notarization for macOS and Windows is not configured at all, so expect
+Gatekeeper/SmartScreen warnings on the unsigned output.

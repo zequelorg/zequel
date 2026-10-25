@@ -1,9 +1,34 @@
 # Zequel — Implementation Status
 
 Maintained per the project's own working rule 3.3: distinguish what's real
-from what's planned. Updated as of the VS Code-benchmark IDE shell pass
-(Quick Open, resizable sidebar) on top of the prior web-app removal /
-frontend-port pass.
+from what's planned. Updated as of the CI/packaging-workflow pass, on top of
+the VS Code-benchmark IDE shell pass (Quick Open, resizable sidebar) and the
+prior web-app removal / frontend-port pass.
+
+## CI/packaging workflow (this pass)
+
+`.github/workflows/build.yml` — new. Implements the matrix `docs/PACKAGING.md`
+already described in prose: a `test` job (Go vet/test/build, JS type-check,
+lint), then a `build` job matrix across macOS Apple Silicon, macOS Intel,
+Windows x64, and Linux x64, each building the Go backend natively for its
+own OS/arch, building the Electron app, running `electron-builder`, and
+uploading the packaged app as a downloadable CI artifact. Proactively
+installs `libfuse2` on the Linux job (a known AppImage-on-modern-Ubuntu
+gotcha, fixed in advance rather than left for a first failed run to teach
+us). Full detail: `docs/PACKAGING.md`.
+
+**Written, never run — same honesty rule as everything else in this
+project:** this sandbox has no GitHub Actions access, so none of this has
+executed for real. It's written carefully against each action's documented
+behavior and cross-checked against this repo's actual script names
+(`pnpm --filter @zequel/desktop type-check`, `pnpm --filter @zequel/desktop
+build`, `electron-builder.yml`'s actual output paths) rather than guessed —
+but "written correctly" is not "confirmed correct." **Push it and watch the
+first real run before trusting any of it**, especially: whether
+`pnpm install --no-frozen-lockfile` actually resolves cleanly against the
+real npm registry (this project has never once gotten that far — see
+"JS/Electron side" below), and whether the Linux `electron-builder` step
+needs any system package beyond the `libfuse2` already added.
 
 ## The pivot is now complete: this is a desktop-only repository
 
@@ -222,8 +247,11 @@ script), not type-checked by `tsc` or exercised in a real Electron window.
   `apps/platform` — this needs building fresh against `internal/aiprovider`,
   not ported, since the old design was subscription-shaped and this
   project explicitly isn't.
-- A real CI packaging pipeline (design exists in `docs/PACKAGING.md`;
-  nothing has actually been run).
+- A *confirmed-working* CI packaging pipeline. The workflow itself now
+  exists (`.github/workflows/build.yml`, this pass) and is no longer just a
+  design in prose — but it has never actually run (no GitHub Actions access
+  from this sandbox), so "confirmed working" is still not started. See
+  "CI/packaging workflow" above.
 - A bounded restart-on-crash policy for the backend process if `zequeld`
   exits unexpectedly after startup.
 
