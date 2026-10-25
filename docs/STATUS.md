@@ -1,7 +1,9 @@
 # Zequel — Implementation Status
 
 Maintained per the project's own working rule 3.3: distinguish what's real
-from what's planned. Updated as of the web-app removal / frontend-port pass.
+from what's planned. Updated as of the VS Code-benchmark IDE shell pass
+(Quick Open, resizable sidebar) on top of the prior web-app removal /
+frontend-port pass.
 
 ## The pivot is now complete: this is a desktop-only repository
 
@@ -122,6 +124,56 @@ internally reviewed, not compiled or rendered.
   language packages, `lucide-react`, `clsx`, `tailwind-merge` — none of
   these are in `pnpm-lock.yaml` yet, for the network reason above.
 
+## VS Code-benchmark IDE shell (written across this pass and the one before it)
+
+Per explicit direction: VS Code as a *design benchmark* (density, restraint,
+information architecture) — not a pixel-for-pixel skin, no copied icon set,
+no copied exact colors. What's actually built, all in `apps/desktop/src/`:
+
+- **Activity Bar** (`components/ActivityBar.tsx`) — the fixed 48px icon rail
+  on the far left, left-accent-bar marks the active view. Only two icons
+  exist: Explorer and Research — both are real, wired views. No placeholder
+  icons for unbuilt features; an inert button that looks clickable is worse
+  than no button.
+- **Multi-file tabs** (`components/TabBar.tsx`, state lifted into `App.tsx`
+  as `Map<path, OpenFile>`) — several files open at once, each tracked
+  independently (`content` vs `savedContent`), a dirty-state dot that swaps
+  to an X on hover, click a tab to switch, click X (or Ctrl/Cmd+W) to close.
+  Closing the active tab falls back to the next most-recently-opened one.
+- **File-type icons** (`lib/file-icon.ts`) — a deliberately small, distinct
+  color-per-extension map using `lucide-react` glyphs already a dependency,
+  used consistently in the file tree, the tab bar, and Quick Open (below) so
+  the same file reads the same way everywhere in the app.
+- **Status Bar** (`components/StatusBar.tsx`) — fixed to the window bottom:
+  active file path on the left, cursor position / language / live backend
+  status on the right. Only shows real information — no fake git-branch
+  segment, no fake formatter segment, nothing that looks wired but isn't.
+- **Quick Open / Command Palette** (`components/CommandPalette.tsx`, *new
+  this pass*) — Cmd/Ctrl+P opens a centered overlay, type to fuzzy-filter
+  every file in the project (a real subsequence-match scorer, not a
+  substring filter — ranks the file name above the full path), arrow keys +
+  Enter to open, Escape to dismiss. Backed by a genuinely new IPC channel,
+  `PROJECT_LIST_FILES` (`electron/main.ts`, `electron/ipc-contract.ts`,
+  `electron/preload.ts`) — a real recursive directory walk on the main-
+  process side, respecting the same project-root containment as every other
+  filesystem handler, skipping `node_modules`/`.git`/`dist`/etc., capped at
+  5000 files. **One honest limitation:** the file list is a snapshot taken
+  when the folder is opened, not a live watch — a file created afterward
+  won't appear in Quick Open until the folder is reopened. No filesystem
+  watcher exists yet; that's real future work, not hidden.
+- **Resizable Side Bar** (`App.tsx`) — a 4px drag handle between the file
+  tree and the editor, width clamped to 170–480px, tracked via
+  `window`-level `mousemove`/`mouseup` (not handle-local) so a fast drag
+  that outruns the cursor doesn't drop the resize.
+- **Ctrl/Cmd+S / Ctrl/Cmd+P / Ctrl/Cmd+W** — save, Quick Open, close tab;
+  all three intercept and replace the OS/browser default for that chord.
+
+**Still genuinely the gap, same as last pass:** none of this has been
+compiled or rendered — see "JS/Electron side" above. `App.tsx`'s JSX,
+`CommandPalette.tsx`'s scorer, and the new `PROJECT_LIST_FILES` handler are
+all written and internally reviewed (brace/paren/bracket balance checked by
+script), not type-checked by `tsc` or exercised in a real Electron window.
+
 ## Implemented and tested (Go)
 
 - `backend/internal/server`: health endpoint, auth middleware, Host-header
@@ -136,8 +188,10 @@ internally reviewed, not compiled or rendered.
 - Opening a real folder, browsing it, opening a file, **editing and saving
   it** — all through the IPC bridge, no mock data, no more read-only `<pre>`.
 - Path-containment check on every filesystem IPC handler.
-- The Research trace-graph view and the Coding/Research mode switcher
-  (new this pass — see above).
+- The Research trace-graph view and the Coding/Research mode switcher.
+- The full VS Code-benchmark IDE shell: multi-file tabs, file-type icons,
+  Status Bar, Quick Open (Cmd/Ctrl+P), resizable Side Bar (new this pass —
+  see above).
 - The full Electron↔Go chain: spawn, stdin token write, stdout port read,
   `/v1/health` call, continuous health polling in the header.
 

@@ -72,6 +72,13 @@ Closing the window stops both processes.
   eventually produce automatically; the view doesn't change when that's
   wired in, only the data source does.
 - A Coding/Research mode switcher in the header.
+- A VS Code-benchmark IDE shell: an Activity Bar, multiple files open as
+  tabs at once (each independently dirty-tracked), file-type icons shared
+  across the tree/tabs/Quick Open, a Status Bar, and — new this pass — Quick
+  Open (Cmd/Ctrl+P: fuzzy-filter every file in the project and jump to it,
+  backed by a real recursive-listing IPC handler, not a mock list) and a
+  draggable Side Bar width. Full detail and the one honest limitation (Quick
+  Open's file list is a snapshot, not a live watch) in `docs/STATUS.md`.
 - A real Go backend process (`backend/`), spawned and health-checked by
   Electron, reachable only from the main process (never the renderer
   directly) over a loopback HTTP connection with a per-launch bearer token

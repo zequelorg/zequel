@@ -152,3 +152,53 @@ ipcMain.handle(
 ipcMain.handle(IPC.BACKEND_HEALTH, async (): Promise<BackendHealth> => {
   return (await backendFetch('/v1/health')) as BackendHealth
 })
+
+// Directories never worth walking into for a "quick open" file list — not a
+// configurable ignore system yet (no .gitignore parsing), just the obvious,
+// near-universal noise. Revisit once backend/internal/index exists and can
+// do this properly.
+const LIST_FILES_IGNORED_DIRS = new Set([
+  'node_modules',
+  '.git',
+  'dist',
+  'dist-electron',
+  'release',
+  'bin',
+  '.next',
+  '.turbo',
+  'target',
+  '__pycache__',
+  '.venv',
+  'venv',
+])
+const LIST_FILES_MAX_RESULTS = 5000
+
+ipcMain.handle(IPC.PROJECT_LIST_FILES, async (): Promise<string[]> => {
+  if (!openProjectRoot) return []
+  const root = openProjectRoot
+  const results: string[] = []
+
+  async function walk(dir: string, relDir: string): Promise<void> {
+    if (results.length >= LIST_FILES_MAX_RESULTS) return
+    let entries: import('node:fs').Dirent[]
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true })
+    } catch {
+      return // unreadable directory (permissions, symlink loop) — skip it
+    }
+    for (const entry of entries) {
+      if (results.length >= LIST_FILES_MAX_RESULTS) return
+      if (entry.name.startsWith('.') && entry.name !== '.github') continue
+      const rel = relDir ? `${relDir}/${entry.name}` : entry.name
+      if (entry.isDirectory()) {
+        if (LIST_FILES_IGNORED_DIRS.has(entry.name)) continue
+        await walk(path.join(dir, entry.name), rel)
+      } else {
+        results.push(rel)
+      }
+    }
+  }
+
+  await walk(root, '')
+  return results
+})

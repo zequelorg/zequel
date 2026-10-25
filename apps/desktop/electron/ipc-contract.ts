@@ -9,6 +9,7 @@ export const IPC = {
   PROJECT_READ_DIRECTORY: 'project:read-directory',
   PROJECT_READ_FILE: 'project:read-file',
   PROJECT_WRITE_FILE: 'project:write-file',
+  PROJECT_LIST_FILES: 'project:list-files',
   BACKEND_HEALTH: 'backend:health',
 } as const
 

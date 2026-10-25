@@ -29,6 +29,11 @@ const zequelBridge = {
       ipcRenderer.invoke(IPC.PROJECT_READ_FILE, relativePath),
     writeFile: (relativePath: string, content: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC.PROJECT_WRITE_FILE, relativePath, content),
+    // Recursive file listing for Quick Open (Cmd/Ctrl+P) — relative paths
+    // only, already filtered to skip node_modules/.git/dist/etc and capped
+    // at 5000 results on the main-process side (see main.ts). Returns []
+    // if no project is open.
+    listFiles: (): Promise<string[]> => ipcRenderer.invoke(IPC.PROJECT_LIST_FILES),
   },
   backend: {
     // Proxies to the Go backend's GET /v1/health. The renderer never sees the
