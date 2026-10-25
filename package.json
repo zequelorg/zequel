@@ -9,8 +9,6 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "dev:platform": "turbo run dev --filter=@zequel/platform",
-    "build:platform": "turbo run build --filter=@zequel/platform",
     "dev:desktop": "turbo run dev --filter=@zequel/desktop",
     "build:desktop": "turbo run build --filter=@zequel/desktop",
     "lint": "turbo run lint",
@@ -18,7 +16,6 @@
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
-    "pg": "^8.23.0",
     "turbo": "^2.3.3",
     "typescript": "5.7.3"
   }

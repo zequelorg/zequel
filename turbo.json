@@ -1,36 +1,10 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalEnv": [
-    "NODE_ENV",
-    "VERCEL_URL",
-    "VERCEL_ENV",
-    "NEXT_PUBLIC_SUPABASE_URL",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    "SUPABASE_URL",
-    "SUPABASE_ANON_KEY",
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "SUPABASE_JWT_SECRET",
-    "POSTGRES_URL",
-    "POSTGRES_PRISMA_URL",
-    "POSTGRES_URL_NON_POOLING",
-    "POSTGRES_USER",
-    "POSTGRES_PASSWORD",
-    "POSTGRES_DATABASE",
-    "POSTGRES_HOST",
-    "RESEND_API_KEY",
-    "AI_GATEWAY_API_KEY",
-    "NEXT_PUBLIC_SITE_URL",
-    "NEXT_PUBLIC_PLATFORM_URL",
-    "NEXT_PUBLIC_ADMIN_URL",
-    "ADMIN_SESSION_SECRET",
-    "OPENROUTER_API_KEY",
-    "SUPABASE_SECRET_KEY",
-    "SUPABASE_PUBLISHABLE_KEY"
-  ],
+  "globalEnv": ["NODE_ENV"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "outputs": ["dist/**", "dist-electron/**", "release/**"]
     },
     "dev": {
       "cache": false,

@@ -1,19 +1,26 @@
 # Zequel Desktop
 
-The local-first Electron application. This replaces the hosted web app as
-Zequel's primary product (see `docs/ARCHITECTURE.md` and `docs/STATUS.md` at
-the repo root for the full picture and what's ported vs. still to do).
+The local-first Electron application — Zequel's only product now. The old
+hosted web app (`apps/platform`) and the shared packages that only it used
+have been deleted from this repository entirely, not just deprecated; see
+`docs/STATUS.md` at the repo root for the full picture of what's ported vs.
+still to do, and the root `README.md` for why.
 
 ## Setup (required once, needs network)
 
-This workspace member was added with its dependencies declared in
-`package.json`, but **not yet resolved into `pnpm-lock.yaml`** — that requires
-reaching the npm registry, which wasn't available while this was written.
-Before anything else:
+This workspace member's dependencies are declared in `package.json`, but
+**not yet resolved into `pnpm-lock.yaml`** — that requires reaching the npm
+registry, which has not been reachable from the sandbox this was written in
+(confirmed directly: both plain `npm install` and `npm install` pointed
+explicitly at this session's HTTP proxy failed with `ENOTFOUND
+registry.npmjs.org`). Before anything else, on a machine with real network
+access:
 
 ```bash
 pnpm install   # NOT --frozen-lockfile — this run needs to resolve and add
-               # the new @zequel/desktop dependencies to the lockfile.
+               # @zequel/desktop's dependencies (including the newly added
+               # Tailwind v4, CodeMirror, and lucide-react/clsx/tailwind-merge
+               # packages) to the lockfile.
 ```
 
 After that one-time install, the lockfile will be complete and frozen
@@ -21,7 +28,9 @@ installs work normally again.
 
 ## Running it
 
-The Go backend needs to be built once first — see `/backend/README.md`:
+The Go backend needs to be built once first — see `/backend/README.md`. In
+this pass, for the first time, a Go toolchain was actually available in the
+sandbox, so this step has genuinely been run and verified, not just written:
 
 ```bash
 cd backend && go build -o bin/zequeld ./cmd/zequeld && cd ..
@@ -45,38 +54,54 @@ Closing the window stops both processes.
 - A secure Electron shell: `contextIsolation`, no `nodeIntegration`, sandboxed
   renderer, a narrow typed preload bridge (`electron/preload.ts`) — the
   renderer has exactly the API surface in that file and nothing else.
-- Opening a real folder via the native OS dialog, browsing its real contents,
-  and reading a real file's contents, all through that bridge. Every
-  filesystem IPC handler in `electron/main.ts` re-validates the requested path
-  against the opened project root before touching disk.
-- `docs/SECURITY.md` documents this boundary — read it before adding any new
+  `docs/SECURITY.md` documents this boundary — read it before adding any new
   IPC handler.
+- Opening a real folder via the native OS dialog, browsing its real contents,
+  reading a real file's contents, editing it in a themed CodeMirror editor
+  (`src/components/CodeEditor.tsx`, ported from the old web app's editor —
+  same CSS-custom-property theming approach, same syntax-highlight token
+  mapping), and **saving it back to disk** through the bridge (Ctrl/Cmd+S or
+  the Save button in the editor tab; the dirty-state dot and disabled-when-
+  clean Save button are real, not decorative).
+- A Research mode with a real, working trace-graph view
+  (`src/components/research/`, ported from the old web app's graph
+  components) — pan/zoom/select/filter/toggle all work. It reads from a
+  fixture (`src/lib/research/graph-fixture.ts`) hand-traced from this repo's
+  own current Go backend code (`server.New()` and its callers/wrappers), not
+  invented data — this is what a real `backend/internal/index` engine will
+  eventually produce automatically; the view doesn't change when that's
+  wired in, only the data source does.
+- A Coding/Research mode switcher in the header.
 - A real Go backend process (`backend/`), spawned and health-checked by
   Electron, reachable only from the main process (never the renderer
-  directly) over a loopback HTTP connection with a per-launch bearer token.
-  Right now it does exactly one thing — answer `/v1/health` — and the header
-  shows the real, live result of that call, not a mock.
+  directly) over a loopback HTTP connection with a per-launch bearer token
+  delivered over stdin. Right now it does exactly one thing — answer
+  `/v1/health` — and the header shows the real, live result of that call,
+  not a mock. See `backend/README.md` for the real build/test/smoke-test
+  results from this pass.
 
 ## What's NOT here yet (so don't assume it works)
 
-- Coding Mode's actual editor/terminal/git UI — built and working in
-  `apps/platform` during this project's web-app phase, not yet ported to this
-  renderer. That's the next milestone.
-- Research Mode's trace graph — also built in `apps/platform`
-  (`components/workspace/research/`), not yet ported.
-- Writing files back to disk through the UI (the IPC handler exists and is
-  wired in `preload.ts`, but no renderer UI calls it yet).
+- The integrated terminal, git panel, search panel, and AI assistant panel
+  that existed in the old web app's Coding Mode — not ported. This is the
+  editor and file browser, not yet the full IDE.
 - AI provider calls of any kind. Nothing in this app talks to an AI model yet.
-- Packaging/distribution (`electron-builder.yml` exists but has not been run).
+- A live code-indexing engine behind the Research graph — it's still reading
+  a hand-traced fixture, described honestly above, not a real indexer.
+- Packaging/distribution (`electron-builder.yml` exists but has not been run;
+  `docs/PACKAGING.md` has the design).
 
-## I have not run this
+## I have not run the JS/Electron side of this
 
-Everything above was written and reviewed for correctness, but this sandbox
-has no network access (can't resolve npm packages, can't fetch Go even if I
-wanted to) and no display (can't launch an actual Electron window). Neither
-`pnpm install`/`pnpm dev` nor `go build`/`go test` in `backend/` have been run
-by me — all **unverified**, the Go side more so, since Go is compiled and
-hand-written Go is more likely to have a small mistake a compiler would catch
-instantly. Please run both (see `/backend/README.md` for the Go commands) and
-tell me exactly what happens, errors included — that's real signal I don't
-have yet.
+The Go backend has genuinely been built, tested, and smoke-tested in this
+pass (see `backend/README.md`) — that part of "I have not run this" is no
+longer true. What's still unverified: `pnpm install`/`pnpm dev` for this
+Electron+React workspace, because this sandbox cannot reach the npm
+registry (tried directly, and tried again routed through the session's own
+HTTP proxy — both failed the same way). Neither the Tailwind build, the
+CodeMirror editor, nor the ported Research graph have been compiled or
+rendered by me. Please run `pnpm install && pnpm --filter @zequel/desktop dev`
+and tell me exactly what happens, errors included — that's real signal I
+don't have yet, especially for anything Tailwind-v4-specific (its `@theme
+inline` CSS syntax in `src/index.css` is copied from a config that worked in
+the old web app, but has not been run standalone before).

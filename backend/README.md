@@ -4,15 +4,41 @@ The local backend daemon (`zequeld`), spawned and supervised by Electron's
 main process. See `/docs/STATUS.md` at the repo root for what's actually
 implemented vs. planned, and `api/API.md` for the HTTP contract.
 
-## I have not run this
+## This has actually been built, tested, and run
 
-This was written in a sandbox with no Go toolchain and no network access, so
-unlike the rest of this project up to this point, **none of this Go code has
-been compiled, let alone run.** It's written carefully and deliberately kept
-to the Go standard library only for this first slice (no external
-dependencies, so `go build` needs no network once you have Go installed) —
-but please treat "unverified" as the literal state until you've run the steps
-below and told me the result.
+Earlier passes of this project were written in a sandbox with no Go
+toolchain, so this used to say "unverified — I have not run this." That
+sandbox changed: Go 1.22+ is now available here, and in this pass I actually
+ran, myself, in this environment:
+
+```
+go build -o bin/zequeld ./cmd/zequeld   # succeeded
+go vet ./...                            # no issues
+go test ./... -v                        # all 8 tests in internal/server pass
+```
+
+...and then an actual end-to-end smoke test of the full request path,
+piping a token to a real running `zequeld` process over stdin and hitting it
+with `curl`:
+
+```
+echo "dev-token" | ./bin/zequeld &
+curl -H "Authorization: Bearer dev-token" http://127.0.0.1:<port>/v1/health
+# → {"status":"ok","version":"0.1.0"}
+curl -H "Authorization: Bearer dev-token" -H "Host: evil.example:<port>" http://127.0.0.1:<port>/v1/health
+# → 403 "unexpected host"
+curl http://127.0.0.1:<port>/v1/health
+# → 401 "missing bearer token"
+```
+
+That confirms the stdin token handoff, port discovery via stdout, the
+health route, the Host-header check, and the missing-token rejection all
+work for real — not just "should work by inspection." What's still
+unverified: the actual Electron side of the handoff (`backend.ts` spawning
+this exact binary and piping its token) — that still needs
+`pnpm --filter @zequel/desktop dev` on a machine with network access to
+npm's registry, which this sandbox does not have (see
+`apps/desktop/README.md`).
 
 ## Prerequisites
 
