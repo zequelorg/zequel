@@ -1,0 +1,198 @@
+name: Build
+
+# Implements the CI shape documented in docs/PACKAGING.md: build the Go
+# backend natively on each target OS, then run electron-builder in that same
+# job so it always picks up the binary built for its own platform —
+# electron-builder does not cross-compile Go, so there is no other
+# correct order (see docs/PACKAGING.md's "core constraint" section).
+#
+# This workflow has never been run (no GitHub Actions access from the
+# sandbox this was written in) — it's written carefully against each
+# action's documented behavior, but "written" is not "verified." Push it
+# and watch the first run; don't assume it's correct just because it reads
+# correctly. See docs/STATUS.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel superseded runs on the same branch/PR instead of letting an old
+# push's build keep consuming runner minutes after a newer push supersedes it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: '1.22'
+  NODE_VERSION: '20'
+
+jobs:
+  # ─── Fast feedback: does the code itself check out, independent of any
+  # packaging concerns? Runs on every push/PR, before the slower multi-OS
+  # packaging matrix below even starts.
+  test:
+    name: Test & type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          # No explicit cache-dependency-path: backend/go.mod has zero
+          # external dependencies right now, so there is no go.sum for
+          # setup-go to hash — pointing cache-dependency-path at a file that
+          # doesn't exist makes the action fail outright, not just skip
+          # caching. Once real dependencies are added (e.g. modernc.org/
+          # sqlite, see docs/STATUS.md), add cache-dependency-path:
+          # backend/go.sum back for faster module-download caching.
+
+      - name: Go vet
+        working-directory: backend
+        run: go vet ./...
+
+      - name: Go test
+        working-directory: backend
+        run: go test ./... -v
+
+      - name: Go build (sanity check, not kept)
+        working-directory: backend
+        run: go build -o /tmp/zequeld-ci-check ./cmd/zequeld
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install JS/TS dependencies
+        run: pnpm install --no-frozen-lockfile
+        # NOT --frozen-lockfile: pnpm-lock.yaml does not yet have a resolved
+        # entry for apps/desktop (see apps/desktop/README.md — it was added
+        # in a sandbox with no network to resolve it). The first real CI run
+        # should commit the regenerated lockfile back via a normal PR so
+        # later runs can switch this to --frozen-lockfile, which is the
+        # safer default once the lockfile is actually complete.
+
+      - name: Type-check
+        run: pnpm --filter @zequel/desktop type-check
+
+      - name: Lint
+        run: pnpm lint
+        continue-on-error: true
+        # continue-on-error until a real lint config is confirmed working
+        # end to end in CI (not exercised from the sandbox this was written
+        # in, per docs/STATUS.md) — remove this line once a green run
+        # confirms it, so lint failures start actually blocking the build.
+
+  # ─── The actual point of this workflow: a real packaged app for each OS.
+  build:
+    name: Package (${{ matrix.target.name }})
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: macOS (Apple Silicon)
+            runner: macos-14
+            goos: darwin
+            goarch: arm64
+            artifact-glob: 'apps/desktop/release/*.dmg'
+          - name: macOS (Intel)
+            runner: macos-13
+            goos: darwin
+            goarch: amd64
+            artifact-glob: 'apps/desktop/release/*.dmg'
+          - name: Windows (x64)
+            runner: windows-latest
+            goos: windows
+            goarch: amd64
+            artifact-glob: 'apps/desktop/release/*.exe'
+          - name: Linux (x64)
+            runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            artifact-glob: 'apps/desktop/release/*.AppImage'
+    runs-on: ${{ matrix.target.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          # No explicit cache-dependency-path: backend/go.mod has zero
+          # external dependencies right now, so there is no go.sum for
+          # setup-go to hash — pointing cache-dependency-path at a file that
+          # doesn't exist makes the action fail outright, not just skip
+          # caching. Once real dependencies are added (e.g. modernc.org/
+          # sqlite, see docs/STATUS.md), add cache-dependency-path:
+          # backend/go.sum back for faster module-download caching.
+
+      # Native build on each matrix runner's own OS/arch — GOOS/GOARCH here
+      # are only set for clarity and to match the matrix table in
+      # docs/PACKAGING.md; on every runner in this matrix they're already
+      # the runner's native target, so this is not cross-compiling.
+      - name: Build Go backend (${{ matrix.target.goos }}/${{ matrix.target.goarch }})
+        working-directory: backend
+        shell: bash
+        env:
+          GOOS: ${{ matrix.target.goos }}
+          GOARCH: ${{ matrix.target.goarch }}
+        run: |
+          mkdir -p bin
+          if [ "${{ matrix.target.goos }}" = "windows" ]; then
+            go build -o bin/zequeld.exe ./cmd/zequeld
+          else
+            go build -o bin/zequeld ./cmd/zequeld
+          fi
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install JS/TS dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      # Ubuntu 22.04+ GitHub runners don't ship libfuse2 by default, which
+      # AppImage's own runtime needs — electron-builder's AppImage target
+      # fails without it. This is a known, documented gotcha (not something
+      # discovered by running this workflow, since it's never been run), so
+      # it's fixed proactively here rather than left for the first failure
+      # to teach us.
+      - name: Install libfuse2 (Linux AppImage dependency)
+        if: matrix.target.goos == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
+
+      - name: Build renderer + Electron main process
+        run: pnpm --filter @zequel/desktop build
+
+      # --publish=never: this workflow produces downloadable build artifacts
+      # (below), it does not publish a GitHub Release. Wiring up an actual
+      # release/auto-update flow is future work — see docs/PACKAGING.md,
+      # which explicitly doesn't address code signing/notarization yet
+      # either. An unsigned build is expected to trigger Gatekeeper/
+      # SmartScreen warnings on macOS/Windows; that's a known, documented
+      # gap, not something this workflow silently papers over.
+      - name: Package with electron-builder
+        working-directory: apps/desktop
+        run: npx electron-builder --publish=never
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zequel-desktop-${{ matrix.target.goos }}-${{ matrix.target.goarch }}
+          path: ${{ matrix.target.artifact-glob }}
+          if-no-files-found: error
+          retention-days: 14

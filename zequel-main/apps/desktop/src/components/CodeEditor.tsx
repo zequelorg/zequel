@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { EditorView, ViewUpdate } from '@codemirror/view'
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
@@ -118,15 +118,56 @@ export interface CursorPosition {
   col: number
 }
 
+export interface RevealRequest {
+  line: number // 1-based
+  nonce: number // changes on every request so the same line can be revealed twice
+}
+
 interface CodeEditorProps {
   value: string
   language: CodingLanguage
   onChange: (value: string) => void
   onCursorChange?: (pos: CursorPosition) => void
   readOnly?: boolean
+  reveal?: RevealRequest | null
+  // Called once the reveal has been applied, so the owner can clear it and a
+  // later tab switch doesn't jump the cursor again.
+  onRevealed?: () => void
 }
 
-export function CodeEditor({ value, language, onChange, onCursorChange, readOnly }: CodeEditorProps) {
+export function CodeEditor({
+  value,
+  language,
+  onChange,
+  onCursorChange,
+  readOnly,
+  reveal,
+  onRevealed,
+}: CodeEditorProps) {
+  const viewRef = useRef<EditorView | null>(null)
+  const appliedNonce = useRef<number | null>(null)
+
+  // Move the cursor to the requested line and center it. Safe to call before
+  // the view exists (it just returns); onCreateEditor and the effect below
+  // both call it, whichever happens last wins and the nonce makes it once-only.
+  const applyReveal = useCallback(() => {
+    const view = viewRef.current
+    if (!view || !reveal || appliedNonce.current === reveal.nonce) return
+    appliedNonce.current = reveal.nonce
+    const line = Math.min(Math.max(reveal.line, 1), view.state.doc.lines)
+    const pos = view.state.doc.line(line).from
+    view.dispatch({
+      selection: { anchor: pos },
+      effects: EditorView.scrollIntoView(pos, { y: 'center' }),
+    })
+    view.focus()
+    onRevealed?.()
+  }, [reveal, onRevealed])
+
+  useEffect(() => {
+    applyReveal()
+  }, [applyReveal])
+
   const extensions = useMemo(
     () => [
       ...languageExtension(language),
@@ -153,6 +194,10 @@ export function CodeEditor({ value, language, onChange, onCursorChange, readOnly
       extensions={extensions}
       onChange={onChange}
       onUpdate={handleUpdate}
+      onCreateEditor={(view) => {
+        viewRef.current = view
+        applyReveal()
+      }}
       readOnly={readOnly}
       basicSetup={{
         lineNumbers: true,

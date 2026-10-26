@@ -26,7 +26,7 @@ registered alongside Solidity; the engine, HTTP contract and UI do not change.
 - [x] Index a Solidity project; contracts, functions, inheritance, calls
 - [x] Reference trace graph from real index data (contract- and function-level)
 - [x] Heuristic security findings surfaced on graph nodes
-- [ ] Findings panel with source jump-to-line and per-finding evidence
+- [x] Findings panel with source jump-to-line (evidence snippets still open)
 - [ ] Import-aware name resolution; solc AST adapter for precision
 - [ ] Storage-layout and external-call/trust-boundary views
 - [ ] Evidence-linked report generation (every claim cites file:line)

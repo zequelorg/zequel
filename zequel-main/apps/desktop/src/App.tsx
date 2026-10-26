@@ -5,7 +5,8 @@ import { ActivityBar, type ActivityView } from './components/ActivityBar'
 import { TabBar } from './components/TabBar'
 import { StatusBar } from './components/StatusBar'
 import { CommandPalette } from './components/CommandPalette'
-import { CodeEditor, type CursorPosition } from './components/CodeEditor'
+import { CodeEditor, type CursorPosition, type RevealRequest } from './components/CodeEditor'
+import { FindingsPanel } from './components/FindingsPanel'
 import { GraphView } from './components/research/graph-view'
 import { languageFromPath } from './lib/coding-language'
 
@@ -62,6 +63,8 @@ export function App() {
   const [cursor, setCursor] = useState<CursorPosition | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [reveal, setReveal] = useState<(RevealRequest & { path: string }) | null>(null)
+  const [saveTick, setSaveTick] = useState(0)
 
   const activeFile = activePath ? openFiles.get(activePath) ?? null : null
   const isDirty = activeFile ? activeFile.content !== activeFile.savedContent : false
@@ -122,6 +125,17 @@ export function App() {
     [openFiles]
   )
 
+  // Open a file and jump to a line (used by the Findings panel).
+  const handleOpenAtLine = useCallback(
+    async (relativePath: string, line: number) => {
+      await handleOpenFile(relativePath)
+      setReveal({ path: relativePath, line, nonce: Date.now() })
+    },
+    [handleOpenFile]
+  )
+
+  const clearReveal = useCallback(() => setReveal(null), [])
+
   const handleCloseTab = useCallback(
     (path: string) => {
       setOpenFiles((prev) => {
@@ -164,6 +178,7 @@ export function App() {
         next.set(activePath, { ...current, savedContent: current.content })
         return next
       })
+      setSaveTick((n) => n + 1) // lets the Findings panel re-scan after a save
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save file')
     } finally {
@@ -238,15 +253,28 @@ export function App() {
         ) : (
           <>
             <aside className="sidebar" style={{ width: sidebarWidth }}>
-              <p className="sidebar-heading">Explorer</p>
-              {projectRoot ? (
-                <FileTree
-                  rootEntries={rootEntries}
-                  onOpenFile={(p) => void handleOpenFile(p)}
-                  activePath={activePath}
-                />
+              {view === 'findings' ? (
+                <>
+                  <p className="sidebar-heading">Findings</p>
+                  <FindingsPanel
+                    projectRoot={projectRoot}
+                    refreshToken={saveTick}
+                    onOpen={(p, l) => void handleOpenAtLine(p, l)}
+                  />
+                </>
               ) : (
-                <p className="empty-state">Open a folder to get started.</p>
+                <>
+                  <p className="sidebar-heading">Explorer</p>
+                  {projectRoot ? (
+                    <FileTree
+                      rootEntries={rootEntries}
+                      onOpenFile={(p) => void handleOpenFile(p)}
+                      activePath={activePath}
+                    />
+                  ) : (
+                    <p className="empty-state">Open a folder to get started.</p>
+                  )}
+                </>
               )}
             </aside>
             <div
@@ -280,6 +308,8 @@ export function App() {
                       language={languageFromPath(activeFile.path)}
                       onChange={handleChangeContent}
                       onCursorChange={setCursor}
+                      reveal={reveal && reveal.path === activeFile.path ? reveal : null}
+                      onRevealed={clearReveal}
                     />
                   </div>
                 </>

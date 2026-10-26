@@ -5,6 +5,23 @@ from what's planned. Updated as of the CI/packaging-workflow pass, on top of
 the VS Code-benchmark IDE shell pass (Quick Open, resizable sidebar) and the
 prior web-app removal / frontend-port pass.
 
+## Findings panel + jump-to-line (written, not compiled)
+
+Renderer-only change on top of the indexer below; no backend changes.
+
+- `src/components/FindingsPanel.tsx` — new Activity Bar view ("Findings").
+  Indexes the open project, lists heuristic findings grouped by file, sorted
+  by severity, with a minimum-severity filter and per-severity counts. The
+  panel states that findings are leads, not verdicts, and that "no findings"
+  does not mean "safe". Re-scans (debounced 400ms) after each save.
+- Clicking a finding opens the file and moves the cursor to the line, centered
+  (`CodeEditor` gained a `reveal` prop + `onRevealed`; the request is cleared
+  once applied so switching tabs does not re-jump).
+- Same status as the indexer: syntax-parsed only, never type-checked or run.
+  Things to check on first launch: the jump when the editor mounts for a file
+  that was not yet open (handled via `onCreateEditor`, untested), and re-scan
+  cost on large projects since indexing is synchronous.
+
 ## EVM research foundation: Solidity indexer → real trace graph (this pass)
 
 First slice of the Coding/Research product direction (see `docs/ROADMAP.md`).
