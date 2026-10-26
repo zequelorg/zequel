@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { IPC, type DirectoryEntry, type BackendHealth } from './ipc-contract'
+import {
+  IPC,
+  type DirectoryEntry,
+  type BackendHealth,
+  type IndexStatus,
+  type ResearchSymbol,
+  type ResearchFinding,
+  type ResearchTraceGraph,
+} from './ipc-contract'
 
 // This is the entire API surface exposed to the renderer. The renderer has
 // no access to `ipcRenderer`, `require`, or any other Node.js capability —
@@ -34,6 +42,17 @@ const zequelBridge = {
     // at 5000 results on the main-process side (see main.ts). Returns []
     // if no project is open.
     listFiles: (): Promise<string[]> => ipcRenderer.invoke(IPC.PROJECT_LIST_FILES),
+  },
+  research: {
+    // (Re)index the open project in the Go backend. The project root is never
+    // sent from here: main.ts registered it with the backend when the user
+    // picked the folder.
+    index: (): Promise<IndexStatus> => ipcRenderer.invoke(IPC.RESEARCH_INDEX),
+    symbols: (query: string): Promise<ResearchSymbol[]> =>
+      ipcRenderer.invoke(IPC.RESEARCH_SYMBOLS, query),
+    trace: (rootId: string, depth: number): Promise<ResearchTraceGraph> =>
+      ipcRenderer.invoke(IPC.RESEARCH_TRACE, rootId, depth),
+    findings: (): Promise<ResearchFinding[]> => ipcRenderer.invoke(IPC.RESEARCH_FINDINGS),
   },
   backend: {
     // Proxies to the Go backend's GET /v1/health. The renderer never sees the

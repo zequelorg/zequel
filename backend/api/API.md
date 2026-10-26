@@ -63,25 +63,42 @@ silent mismatch.
 Returns `200 OK` with:
 
 ```json
-{ "status": "ok", "version": "0.1.0" }
+{ "status": "ok", "version": "0.2.0" }
 ```
 
 Any other HTTP method on this path returns `405 Method Not Allowed`.
 
-This is the only route that exists right now. Everything below is the
-*planned* shape for upcoming routes — documented ahead of implementation so
-the contract is designed deliberately, not reverse-engineered from whatever
-got built first. None of it exists yet; do not build against it as if it
-does.
+### Project and index
+
+All JSON. Errors use `{ "error": { "code": "...", "message": "..." } }`
+(health and the auth/host middleware still return plain text).
+
+- `POST /v1/project/open` — body `{ "root": "/abs/path" }`. Called only by
+  Electron's main process with a path from the native folder dialog. Returns
+  the status object below. `400 bad_project_root` for a relative/missing path.
+- `POST /v1/index/start` — (re)index the open project synchronously and
+  return status. `409 no_project` if none open.
+- `GET /v1/index/status` — `{ state: "no_project"|"not_indexed"|"ready",
+  root, frameworks: [...], stats: { files, symbols, edges, findings,
+  languages, truncated } }`.
+
+### Research (require an indexed project, else `409 no_project|not_indexed`)
+
+- `GET /v1/research/symbols?q=&kinds=contract,function&limit=500` →
+  `{ symbols: [{ id, name, kind, parent?, path, line, arity, visibility?,
+  mutability?, language }] }`. Symbol IDs look like
+  `src/Vault.sol::Vault` and `src/Vault.sol::Vault.withdraw/1`; URL-encode them.
+- `GET /v1/research/trace?root=<symbolId>&depth=1..4` → the `TraceGraph`
+  shape in `apps/desktop/src/lib/research/graph-types.ts` (`root`, `nodes`
+  with `direction: inflows|outflows`, `edges`). Contract roots trace at
+  contract granularity (member calls rolled up); function roots at function
+  granularity. `404 not_found` for an unknown symbol.
+- `GET /v1/research/findings` → `{ findings: [{ symbolId, path, line,
+  severity: info|warning|critical, rule, message }] }`. Heuristic leads only.
 
 ## Routes (planned, not implemented)
 
-- `POST /v1/project/open` — register a project root with the backend (the
-  Electron-side root-containment check in `main.ts` stays regardless; this is
-  about the backend knowing what to index, not a second copy of that
-  security boundary).
-- `GET /v1/index/status`, `POST /v1/index/start` — code-indexing coordination
-  for Research Mode.
+- Search, git, and terminal routes, and AI-agent/streaming routes (below).
 
 ### Streaming (proposed design, not implemented)
 
@@ -137,16 +154,3 @@ Coding and Research streaming endpoints specifically — that's tied to the
 AI-agent and indexing design, which hasn't started (see `docs/STATUS.md`).
 This section is the transport/envelope/cancellation contract those routes
 will use once they exist, decided now so they don't each invent their own.
-
-## Error shape (planned, not yet consistently implemented)
-
-`/v1/health`'s error responses today are plain text (`http.Error`), not JSON.
-Once more routes exist, errors should return a consistent JSON shape, e.g.:
-
-```json
-{ "error": { "code": "not_found", "message": "..." } }
-```
-
-This isn't implemented yet because there's only one route so far and
-retrofitting one endpoint's error format isn't worth doing in isolation — it
-should be decided once there's a second route to be consistent with.

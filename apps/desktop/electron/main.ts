@@ -1,7 +1,14 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { IPC, type BackendHealth } from './ipc-contract'
+import {
+  IPC,
+  type BackendHealth,
+  type IndexStatus,
+  type ResearchSymbol,
+  type ResearchFinding,
+  type ResearchTraceGraph,
+} from './ipc-contract'
 import { startBackend, stopBackend, backendFetch } from './backend'
 
 // ─── Project root authorization ─────────────────────────────────────────────
@@ -113,6 +120,17 @@ ipcMain.handle(IPC.PROJECT_OPEN_FOLDER_DIALOG, async () => {
   })
   if (result.canceled || result.filePaths.length === 0) return null
   openProjectRoot = result.filePaths[0]
+  // Tell the backend which folder to index. The root comes from the native
+  // dialog above, never from the renderer. A failure here (backend not built
+  // or not running) must not block opening the folder for editing.
+  try {
+    await backendFetch('/v1/project/open', {
+      method: 'POST',
+      body: JSON.stringify({ root: openProjectRoot }),
+    })
+  } catch (err) {
+    console.error('[backend] could not register project root:', err)
+  }
   return openProjectRoot
 })
 
@@ -151,6 +169,39 @@ ipcMain.handle(
 
 ipcMain.handle(IPC.BACKEND_HEALTH, async (): Promise<BackendHealth> => {
   return (await backendFetch('/v1/health')) as BackendHealth
+})
+
+// ─── Research (thin, validated proxies to the Go backend) ───────────────────
+
+ipcMain.handle(IPC.RESEARCH_INDEX, async (): Promise<IndexStatus> => {
+  return (await backendFetch('/v1/index/start', { method: 'POST' })) as IndexStatus
+})
+
+ipcMain.handle(IPC.RESEARCH_SYMBOLS, async (_event, query: unknown): Promise<ResearchSymbol[]> => {
+  const params = new URLSearchParams({
+    q: typeof query === 'string' ? query.slice(0, 200) : '',
+    kinds: 'contract,interface,library,function',
+    limit: '500',
+  })
+  const res = (await backendFetch(`/v1/research/symbols?${params}`)) as { symbols: ResearchSymbol[] }
+  return res.symbols
+})
+
+ipcMain.handle(
+  IPC.RESEARCH_TRACE,
+  async (_event, rootId: unknown, depth: unknown): Promise<ResearchTraceGraph> => {
+    if (typeof rootId !== 'string' || rootId.length === 0 || rootId.length > 1000) {
+      throw new Error('A symbol id is required.')
+    }
+    const d = typeof depth === 'number' && Number.isFinite(depth) ? Math.trunc(depth) : 1
+    const params = new URLSearchParams({ root: rootId, depth: String(d) })
+    return (await backendFetch(`/v1/research/trace?${params}`)) as ResearchTraceGraph
+  }
+)
+
+ipcMain.handle(IPC.RESEARCH_FINDINGS, async (): Promise<ResearchFinding[]> => {
+  const res = (await backendFetch('/v1/research/findings')) as { findings: ResearchFinding[] }
+  return res.findings
 })
 
 // Directories never worth walking into for a "quick open" file list — not a

@@ -11,9 +11,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"zequel.dev/backend/internal/index"
 )
 
-const Version = "0.1.0"
+const Version = "0.2.0"
 
 // New builds the server's handler.
 //   - token is the per-launch bearer token every request must present (see
@@ -34,15 +36,16 @@ const Version = "0.1.0"
 // routes() is protected automatically, with no action required.
 func New(token string, port int) http.Handler {
 	mux := http.NewServeMux()
-	routes(mux)
+	routes(mux, newResearchState(index.DefaultRegistry()))
 	expectedHost := fmt.Sprintf("127.0.0.1:%d", port)
 	return requireHost(expectedHost, requireToken(token, mux.ServeHTTP))
 }
 
 // routes registers every endpoint. Add new routes here, unauthenticated —
 // New() applies auth once, above, to everything this function registers.
-func routes(mux *http.ServeMux) {
+func routes(mux *http.ServeMux, rs *researchState) {
 	mux.HandleFunc("/v1/health", handleHealth)
+	rs.register(mux)
 }
 
 type healthResponse struct {

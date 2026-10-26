@@ -63,14 +63,12 @@ Closing the window stops both processes.
   mapping), and **saving it back to disk** through the bridge (Ctrl/Cmd+S or
   the Save button in the editor tab; the dirty-state dot and disabled-when-
   clean Save button are real, not decorative).
-- A Research mode with a real, working trace-graph view
-  (`src/components/research/`, ported from the old web app's graph
-  components) — pan/zoom/select/filter/toggle all work. It reads from a
-  fixture (`src/lib/research/graph-fixture.ts`) hand-traced from this repo's
-  own current Go backend code (`server.New()` and its callers/wrappers), not
-  invented data — this is what a real `backend/internal/index` engine will
-  eventually produce automatically; the view doesn't change when that's
-  wired in, only the data source does.
+- A Research mode with a trace-graph view (`src/components/research/`)
+  — pan/zoom/select/filter/toggle — now fed by the Go indexer
+  (`backend/internal/index`): it indexes the open Solidity project, lets you
+  pick a root contract or function, and renders real inheritance/call
+  relationships with heuristic findings. Written but not yet compiled or run;
+  see `docs/STATUS.md`.
 - A Coding/Research mode switcher in the header.
 - A VS Code-benchmark IDE shell: an Activity Bar, multiple files open as
   tabs at once (each independently dirty-tracked), file-type icons shared

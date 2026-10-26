@@ -234,7 +234,7 @@ export function App() {
         <ActivityBar active={view} onChange={setView} />
 
         {view === 'research' ? (
-          <GraphView />
+          <GraphView projectRoot={projectRoot} />
         ) : (
           <>
             <aside className="sidebar" style={{ width: sidebarWidth }}>

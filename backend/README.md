@@ -24,7 +24,7 @@ with `curl`:
 ```
 echo "dev-token" | ./bin/zequeld &
 curl -H "Authorization: Bearer dev-token" http://127.0.0.1:<port>/v1/health
-# → {"status":"ok","version":"0.1.0"}
+# → {"status":"ok","version":"0.2.0"}
 curl -H "Authorization: Bearer dev-token" -H "Host: evil.example:<port>" http://127.0.0.1:<port>/v1/health
 # → 403 "unexpected host"
 curl http://127.0.0.1:<port>/v1/health
@@ -118,3 +118,13 @@ delivery and dev-vs-packaged binary resolution. That's it — `internal/project`
 and `internal/storage` each contain only a `doc.go` recording their intended
 purpose and the Coding/Research boundary rule (see that file in each
 directory) — no actual logic yet. Nothing in this repo should claim otherwise.
+
+## Update: indexer and research routes (written, not yet compiled)
+
+`internal/project` and `internal/index` now contain real code (Solidity
+adapter, reference resolution, trace graph) and `internal/server/research.go`
+exposes it — see `docs/STATUS.md` for the honest status. These were written
+in a sandbox without a Go toolchain: run `go vet ./... && go test ./...` first
+and fix whatever the compiler or tests report. `internal/research`,
+`internal/coding`, `internal/aiprovider` and `internal/storage` are still
+`doc.go` only.

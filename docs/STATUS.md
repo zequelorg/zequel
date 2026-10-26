@@ -5,6 +5,57 @@ from what's planned. Updated as of the CI/packaging-workflow pass, on top of
 the VS Code-benchmark IDE shell pass (Quick Open, resizable sidebar) and the
 prior web-app removal / frontend-port pass.
 
+## EVM research foundation: Solidity indexer → real trace graph (this pass)
+
+First slice of the Coding/Research product direction (see `docs/ROADMAP.md`).
+The Research graph no longer reads a hand-written fixture; it reads the output
+of a real indexer in the Go backend.
+
+**Written, NOT compiled or run.** The sandbox this pass was written in had no
+Go toolchain and no npm registry access. Nothing below has been through
+`go build`, `go vet`, `go test`, `tsc`, or a real Electron window. The only
+checks run were brace-balance scripts and a TypeScript *syntax* parse of the
+changed `.ts/.tsx` files (no type-check). **First thing to do:**
+`cd backend && go vet ./... && go test ./...` and report anything that fails —
+the new tests encode the intended behavior, so a failure is either a compile
+error or a real parser/resolver bug worth fixing.
+
+What was added:
+
+- `backend/internal/index` — language-agnostic engine (`Build`, reference
+  resolution, `Trace`, `ListSymbols`) behind an `Adapter` interface +
+  `Registry`. **Solidity adapter** (`solidity.go`): tolerant token-level
+  parser for contracts/interfaces/libraries, inheritance, functions,
+  modifiers, events, typed state variables, and call extraction (local,
+  `this`/`super`, `Contract.fn`, calls through contract-typed state
+  variables, modifier use, `emit`, `new`). Unresolved bases (e.g. OpenZeppelin
+  when `lib/`/`node_modules/` are skipped) become `external` placeholder nodes.
+- Heuristic findings (leads, not verdicts): `tx-origin`, `selfdestruct`,
+  `delegatecall`, `low-level-call`, `inline-assembly`, and
+  `reentrancy-heuristic` (state variable written after a low-level call or a
+  call through a contract-typed state variable, unless a `*reentran*` modifier
+  is present).
+- `backend/internal/project` — root validation + ecosystem marker detection
+  (foundry, hardhat, anchor, cargo, gomod).
+- HTTP routes (`backend/api/API.md`): `POST /v1/project/open`,
+  `POST /v1/index/start`, `GET /v1/index/status`, `GET /v1/research/symbols`,
+  `GET /v1/research/trace`, `GET /v1/research/findings`, with the consistent
+  `{error:{code,message}}` shape. Backend version bumped to 0.2.0.
+- Electron: `research.*` bridge methods (named channels, validated in
+  `main.ts`); the project root is registered with the backend by `main.ts`
+  from the native folder dialog, never supplied by the renderer.
+- `graph-view.tsx` rewritten: indexes on open, root-symbol picker, depth
+  selector, re-index button, real empty/error states. `graph-fixture.ts`
+  deleted.
+
+Known limits (also in `internal/index/doc.go`): no type checking; imports are
+not resolved by path (contract names resolve project-wide, same file first, so
+duplicate names across files can mis-resolve); parameter/local types unknown,
+so calls on parameters or `IFoo(x).bar()` casts are not resolved; no
+filesystem watcher (re-index on view open or button); indexing is synchronous.
+The intended upgrade path for precision is solc's AST behind the same
+`Adapter` interface.
+
 ## CI/packaging workflow (this pass)
 
 `.github/workflows/build.yml` — new. Implements the matrix `docs/PACKAGING.md`
@@ -112,7 +163,7 @@ internally reviewed, not compiled or rendered.
 
 - **Research trace graph** — ported into `apps/desktop/src/components/research/`
   (`graph-canvas.tsx`, `graph-sidebar.tsx`, `graph-view.tsx`) and
-  `apps/desktop/src/lib/research/` (`graph-types.ts`, `graph-fixture.ts`).
+  `apps/desktop/src/lib/research/` (`graph-types.ts`).
   Pan/zoom/drag, node select, inflow/outflow filter, "flagged only" toggle —
   all ported unchanged from the working web-app version. The fixture data
   itself was **rewritten**, not just copied: the old fixture traced

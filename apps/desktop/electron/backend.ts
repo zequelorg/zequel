@@ -147,12 +147,22 @@ export async function backendFetch(urlPath: string, init?: RequestInit): Promise
   const res = await fetch(`http://127.0.0.1:${backendPort}${urlPath}`, {
     ...init,
     headers: {
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
       ...(init?.headers ?? {}),
       Authorization: `Bearer ${backendToken}`,
     },
   })
   if (!res.ok) {
-    throw new Error(`Backend request to ${urlPath} failed: ${res.status} ${res.statusText}`)
+    // New routes return { error: { code, message } } (see backend/api/API.md);
+    // surface the message when present so the UI can show something useful.
+    let detail = `${res.status} ${res.statusText}`
+    try {
+      const body = (await res.json()) as { error?: { message?: string } }
+      if (body.error?.message) detail = body.error.message
+    } catch {
+      /* non-JSON error body (health/auth middleware): keep status text */
+    }
+    throw new Error(`Backend request to ${urlPath} failed: ${detail}`)
   }
   return res.json()
 }
